@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Tracker</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --surface: #fffdf8;
+    --ink: #1f2421;
+    --muted: #6b716c;
+    --line: #ddd7c9;
+    --accent: #1f6f5c;
+    --accent-ink: #ffffff;
+    --danger: #a8402c;
+    --focus: #d9941e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161a18;
+      --surface: #1f2522;
+      --ink: #ecebe4;
+      --muted: #9aa39c;
+      --line: #343c37;
+      --accent: #58b79f;
+      --accent-ink: #10201b;
+      --danger: #e58a75;
+      --focus: #e9b24c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 { font: 700 2rem/1.1 ui-serif, Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.01em; }
+  #count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  form.add { display: flex; gap: 8px; margin: 24px 0 8px; }
+  input[type="text"], textarea {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  button {
+    font: inherit;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 8px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: 0.6; cursor: default; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .filters { display: flex; gap: 4px; margin: 16px 0; }
+  .filters button { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 12px; }
+  .filters button[aria-pressed="true"] { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; }
+
+  #status { min-height: 1.5em; margin: 0 0 8px; color: var(--danger); }
+
+  ul#list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  li.task {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+  }
+  li.task input[type="checkbox"] { width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--accent); cursor: pointer; }
+  .body { min-width: 0; }
+  .title { font-weight: 600; overflow-wrap: anywhere; }
+  .notes { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 2px; }
+  li.done .title { text-decoration: line-through; color: var(--muted); font-weight: 400; }
+  .actions { display: flex; gap: 6px; }
+  .actions button { padding: 4px 10px; font-size: 0.9rem; }
+  form.edit { grid-column: 2 / -1; display: grid; gap: 8px; }
+  form.edit .row { display: flex; gap: 8px; }
+  .empty { color: var(--muted); text-align: center; padding: 36px 0; border: 1px dashed var(--line); border-radius: 10px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 520px) {
+    li.task { grid-template-columns: auto 1fr; }
+    .actions { grid-column: 2; }
+    form.edit { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Task Tracker</h1>
+    <span id="count" aria-live="polite"></span>
+  </header>
+
+  <form class="add" id="add-form" autocomplete="off">
+    <label class="sr-only" for="new-title">New task</label>
+    <input type="text" id="new-title" maxlength="200" placeholder="What needs doing?" required>
+    <button class="primary" type="submit">Add task</button>
+  </form>
+
+  <div class="filters" role="group" aria-label="Filter tasks">
+    <button type="button" data-filter="all" aria-pressed="true">All</button>
+    <button type="button" data-filter="open" aria-pressed="false">Open</button>
+    <button type="button" data-filter="done" aria-pressed="false">Completed</button>
+  </div>
+
+  <p id="status" role="alert"></p>
+  <ul id="list" aria-label="Tasks"></ul>
+</main>
+
+<script>
+(function () {
+  var tasks = [];
+  var filter = 'all';
+  var editingId = null;
+
+  var list = document.getElementById('list');
+  var statusEl = document.getElementById('status');
+  var countEl = document.getElementById('count');
+  var addForm = document.getElementById('add-form');
+  var newTitle = document.getElementById('new-title');
+
+  function api(method, url, body) {
+    var opts = { method: method, headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts).then(function (res) {
+      if (res.status === 204) return null;
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+        return data;
+      });
+    });
+  }
+
+  function showError(err) { statusEl.textContent = err && err.message ? err.message : 'Something went wrong.'; }
+  function clearError() { statusEl.textContent = ''; }
+
+  function el(tag, props, children) {
+    var node = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'text') node.textContent = props[k];
+      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2), props[k]);
+      else if (k === 'className' || k === 'value' || k === 'checked' || k === 'type' || k === 'id' || k === 'maxLength' || k === 'required') node[k] = props[k];
+      else node.setAttribute(k, props[k]);
+    });
+    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+
+  function sortTasks() {
+    tasks.sort(function (a, b) {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return b.id - a.id;
+    });
+  }
+
+  function replaceTask(updated) {
+    tasks = tasks.map(function (t) { return t.id === updated.id ? updated : t; });
+    sortTasks();
+  }
+
+  function render() {
+    var open = tasks.filter(function (t) { return !t.completed; }).length;
+    countEl.textContent = tasks.length === 0 ? '' : open + ' open of ' + tasks.length;
+
+    var visible = tasks.filter(function (t) {
+      return filter === 'all' || (filter === 'open' ? !t.completed : t.completed);
+    });
+
+    list.textContent = '';
+    if (visible.length === 0) {
+      var msg = tasks.length === 0 ? 'No tasks yet. Add your first one above.'
+        : filter === 'open' ? 'Nothing open. All caught up.'
+        : 'No completed tasks yet.';
+      list.appendChild(el('li', { className: 'empty', text: msg }));
+      return;
+    }
+    visible.forEach(function (t) { list.appendChild(t.id === editingId ? editRow(t) : viewRow(t)); });
+  }
+
+  function viewRow(t) {
+    var checkbox = el('input', {
+      type: 'checkbox',
+      checked: t.completed,
+      'aria-label': (t.completed ? 'Reopen: ' : 'Complete: ') + t.title,
+      onchange: function () {
+        checkbox.disabled = true;
+        clearError();
+        api('PATCH', '/api/tasks/' + t.id, { completed: !t.completed })
+          .then(function (updated) { replaceTask(updated); })
+          .catch(showError)
+          .then(render);
+      }
+    });
+    var body = el('div', { className: 'body' }, [
+      el('div', { className: 'title', text: t.title }),
+      t.notes ? el('div', { className: 'notes', text: t.notes }) : null
+    ]);
+    var actions = el('div', { className: 'actions' }, [
+      el('button', { type: 'button', text: 'Edit', 'aria-label': 'Edit: ' + t.title, onclick: function () {
+        editingId = t.id; render();
+        var input = document.getElementById('edit-title');
+        if (input) input.focus();
+      } }),
+      el('button', { type: 'button', className: 'danger', text: 'Delete', 'aria-label': 'Delete: ' + t.title, onclick: function (e) {
+        e.target.disabled = true;
+        clearError();
+        api('DELETE', '/api/tasks/' + t.id)
+          .then(function () { tasks = tasks.filter(function (x) { return x.id !== t.id; }); })
+          .catch(showError)
+          .then(render);
+      } })
+    ]);
+    return el('li', { className: 'task' + (t.completed ? ' done' : '') }, [checkbox, body, actions]);
+  }
+
+  function editRow(t) {
+    var title = el('input', { type: 'text', id: 'edit-title', value: t.title, maxLength: 200, required: true, 'aria-label': 'Task title' });
+    var notes = el('textarea', { maxlength: '2000', placeholder: 'Notes (optional)', 'aria-label': 'Notes' });
+    notes.value = t.notes;
+    var save = el('button', { type: 'submit', className: 'primary', text: 'Save' });
+    var cancel = el('button', { type: 'button', text: 'Cancel', onclick: function () { editingId = null; render(); } });
+    var form = el('form', { className: 'edit', onsubmit: function (e) {
+      e.preventDefault();
+      if (!title.value.trim()) { title.focus(); return; }
+      save.disabled = true;
+      clearError();
+      api('PATCH', '/api/tasks/' + t.id, { title: title.value, notes: notes.value })
+        .then(function (updated) { replaceTask(updated); editingId = null; })
+        .catch(showError)
+        .then(render);
+    }, onkeydown: function (e) { if (e.key === 'Escape') { editingId = null; render(); } } }, [
+      title, notes, el('div', { className: 'row' }, [save, cancel])
+    ]);
+    var spacer = el('span', {});
+    return el('li', { className: 'task' }, [spacer, form]);
+  }
+
+  addForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var title = newTitle.value.trim();
+    if (!title) return;
+    var btn = addForm.querySelector('button');
+    btn.disabled = true;
+    clearError();
+    api('POST', '/api/tasks', { title: title })
+      .then(function (created) { tasks.push(created); sortTasks(); newTitle.value = ''; })
+      .catch(showError)
+      .then(function () { btn.disabled = false; render(); newTitle.focus(); });
+  });
+
+  document.querySelectorAll('.filters button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.getAttribute('data-filter');
+      document.querySelectorAll('.filters button').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      render();
+    });
+  });
+
+  api('GET', '/api/tasks')
+    .then(function (data) { tasks = data; sortTasks(); })
+    .catch(showError)
+    .then(render);
+})();
+</script>
+</body>
+</html>
