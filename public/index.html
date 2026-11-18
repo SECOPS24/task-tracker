@@ -4,29 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Task Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231f6f5c'/%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #f4f1ea;
     --surface: #fffdf8;
+    --surface-2: #ece7db;
     --ink: #1f2421;
     --muted: #6b716c;
     --line: #ddd7c9;
     --accent: #1f6f5c;
+    --accent-soft: #dcebe5;
     --accent-ink: #ffffff;
     --danger: #a8402c;
     --focus: #d9941e;
+    --shadow: 0 8px 24px rgba(31, 36, 33, 0.12);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #161a18;
       --surface: #1f2522;
+      --surface-2: #29302c;
       --ink: #ecebe4;
       --muted: #9aa39c;
       --line: #343c37;
       --accent: #58b79f;
+      --accent-soft: #24382f;
       --accent-ink: #10201b;
       --danger: #e58a75;
       --focus: #e9b24c;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     }
   }
   * { box-sizing: border-box; }
@@ -36,101 +43,215 @@
     color: var(--ink);
     font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 680px; margin: 0 auto; padding: 40px 20px 80px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  h1 { font: 700 2rem/1.1 ui-serif, Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.01em; }
-  #count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  [data-icon] { display: inline-grid; }
+  svg.icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-  form.add { display: flex; gap: 8px; margin: 24px 0 8px; }
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  .brand .mark svg.icon { width: 20px; height: 20px; stroke-width: 2.2; }
+  h1 { font: 700 1.35rem/1.1 ui-serif, Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.01em; }
+  #count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; max-width: 1040px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  /* Views menu */
+  nav.views h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 6px 12px 8px; font-weight: 600; }
+  nav.views ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.views button {
+    width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    border: 0; background: transparent; color: var(--ink); padding: 9px 12px; border-radius: 8px;
+  }
+  nav.views button:hover { background: var(--surface-2); }
+  nav.views button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav.views .label { flex: 1; }
+  nav.views .badge {
+    min-width: 24px; text-align: center; font-size: 0.8rem; font-variant-numeric: tabular-nums;
+    padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 600;
+  }
+  nav.views button[aria-current="true"] .badge { background: var(--accent); color: var(--accent-ink); }
+
+  /* Controls */
   input[type="text"], textarea {
-    width: 100%;
-    font: inherit;
-    color: var(--ink);
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 12px;
+    width: 100%; font: inherit; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
   }
   textarea { resize: vertical; min-height: 64px; }
   button {
-    font: inherit;
-    border-radius: 8px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    color: var(--ink);
-    padding: 8px 14px;
-    cursor: pointer;
-    white-space: nowrap;
+    font: inherit; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); padding: 8px 14px; cursor: pointer; white-space: nowrap;
   }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  button.danger { color: var(--danger); }
+  button.with-icon { display: inline-flex; align-items: center; gap: 6px; }
+  button.icon-only { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--muted); }
+  button.icon-only:hover { color: var(--ink); background: var(--surface-2); }
+  button.icon-only.danger:hover { color: var(--danger); }
   button:disabled { opacity: 0.6; cursor: default; }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-  .filters { display: flex; gap: 4px; margin: 16px 0; }
-  .filters button { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 12px; }
-  .filters button[aria-pressed="true"] { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; }
+  form.add { display: flex; gap: 8px; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
+  .toolbar h2 { font: 700 1.15rem/1.2 ui-serif, Georgia, "Times New Roman", serif; margin: 0; }
+  .toolbar .menus { display: flex; gap: 6px; }
+
+  /* Dropdown menus */
+  .menu-wrap { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 210px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 6px; display: grid; gap: 2px;
+  }
+  .menu[hidden] { display: none; }
+  .menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    border: 0; background: transparent; padding: 8px 10px; border-radius: 6px;
+  }
+  .menu button:hover, .menu button:focus-visible { background: var(--surface-2); }
+  .menu button.danger { color: var(--danger); }
+  .menu .tick { width: 18px; height: 18px; display: grid; place-items: center; color: var(--accent); }
+  .menu .sep { height: 1px; background: var(--line); margin: 4px 2px; }
 
   #status { min-height: 1.5em; margin: 0 0 8px; color: var(--danger); }
 
+  /* Task list */
   ul#list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   li.task {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 12px;
-    align-items: start;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
   }
   li.task input[type="checkbox"] { width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--accent); cursor: pointer; }
   .body { min-width: 0; }
   .title { font-weight: 600; overflow-wrap: anywhere; }
   .notes { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 2px; }
   li.done .title { text-decoration: line-through; color: var(--muted); font-weight: 400; }
-  .actions { display: flex; gap: 6px; }
-  .actions button { padding: 4px 10px; font-size: 0.9rem; }
+  .actions { display: flex; gap: 4px; margin: -4px -6px -4px 0; }
+  .actions button.icon-only { border-color: transparent; background: transparent; }
   form.edit { grid-column: 2 / -1; display: grid; gap: 8px; }
   form.edit .row { display: flex; gap: 8px; }
-  .empty { color: var(--muted); text-align: center; padding: 36px 0; border: 1px dashed var(--line); border-radius: 10px; }
+  .empty { color: var(--muted); text-align: center; padding: 36px 16px; border: 1px dashed var(--line); border-radius: 10px; display: grid; justify-items: center; gap: 8px; }
+  .empty svg.icon { width: 28px; height: 28px; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  @media (max-width: 520px) {
-    li.task { grid-template-columns: auto 1fr; }
-    .actions { grid-column: 2; }
-    form.edit { grid-column: 1 / -1; }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px 16px 64px; }
+    .topbar { padding: 12px 16px; }
+    nav.views h2 { display: none; }
+    nav.views ul { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+    nav.views button { justify-content: center; padding: 8px 4px; gap: 6px; font-size: 0.95rem; }
+    nav.views .label { flex: none; }
+    nav.views .view-icon { display: none; }
+    .add-text { display: none; }
   }
 </style>
 </head>
 <body>
-<main>
-  <header>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" data-icon="logo"></span>
     <h1>Task Tracker</h1>
-    <span id="count" aria-live="polite"></span>
-  </header>
-
-  <form class="add" id="add-form" autocomplete="off">
-    <label class="sr-only" for="new-title">New task</label>
-    <input type="text" id="new-title" maxlength="200" placeholder="What needs doing?" required>
-    <button class="primary" type="submit">Add task</button>
-  </form>
-
-  <div class="filters" role="group" aria-label="Filter tasks">
-    <button type="button" data-filter="all" aria-pressed="true">All</button>
-    <button type="button" data-filter="open" aria-pressed="false">Open</button>
-    <button type="button" data-filter="done" aria-pressed="false">Completed</button>
   </div>
+  <span id="count" aria-live="polite"></span>
+</header>
 
-  <p id="status" role="alert"></p>
-  <ul id="list" aria-label="Tasks"></ul>
-</main>
+<div class="layout">
+  <nav class="views" aria-label="Views">
+    <h2>Views</h2>
+    <ul>
+      <li><button type="button" data-filter="all" aria-current="true"><span class="view-icon" data-icon="list"></span><span class="label">All tasks</span><span class="badge" id="n-all">0</span></button></li>
+      <li><button type="button" data-filter="open"><span class="view-icon" data-icon="circle"></span><span class="label">Open</span><span class="badge" id="n-open">0</span></button></li>
+      <li><button type="button" data-filter="done"><span class="view-icon" data-icon="checkCircle"></span><span class="label">Completed</span><span class="badge" id="n-done">0</span></button></li>
+    </ul>
+  </nav>
+
+  <main>
+    <form class="add" id="add-form" autocomplete="off">
+      <label class="sr-only" for="new-title">New task</label>
+      <input type="text" id="new-title" maxlength="200" placeholder="What needs doing?" required>
+      <button class="primary with-icon" type="submit" aria-label="Add task"><span data-icon="plus"></span><span class="add-text">Add task</span></button>
+    </form>
+
+    <div class="toolbar">
+      <h2 id="view-title">All tasks</h2>
+      <div class="menus">
+        <div class="menu-wrap">
+          <button type="button" class="with-icon" id="sort-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">
+            <span data-icon="sort"></span><span id="sort-label">Newest first</span><span data-icon="chevron"></span>
+          </button>
+          <div class="menu" id="sort-menu" role="menu" aria-label="Sort tasks" hidden>
+            <button type="button" role="menuitemradio" data-sort="newest"><span class="tick"></span>Newest first</button>
+            <button type="button" role="menuitemradio" data-sort="oldest"><span class="tick"></span>Oldest first</button>
+            <button type="button" role="menuitemradio" data-sort="az"><span class="tick"></span>Title A to Z</button>
+          </div>
+        </div>
+        <div class="menu-wrap">
+          <button type="button" class="icon-only" id="more-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu" aria-label="More actions" title="More actions">
+            <span data-icon="more"></span>
+          </button>
+          <div class="menu" id="more-menu" role="menu" aria-label="More actions" hidden>
+            <button type="button" role="menuitem" id="act-complete-all"><span data-icon="checkCircle"></span>Mark all complete</button>
+            <button type="button" role="menuitem" id="act-reopen-all"><span data-icon="circle"></span>Reopen all</button>
+            <div class="sep" role="separator"></div>
+            <button type="button" role="menuitem" class="danger" id="act-clear-done"><span data-icon="trash"></span><span id="clear-label">Delete completed</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p id="status" role="alert"></p>
+    <ul id="list" aria-label="Tasks"></ul>
+  </main>
+</div>
 
 <script>
 (function () {
+  var ICONS = {
+    logo: '<path d="M6 12.5l4 4 8-9"/>',
+    list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke-width="2.6"/>',
+    circle: '<circle cx="12" cy="12" r="8.5"/>',
+    checkCircle: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+    sort: '<path d="M4 7h11M4 12h7M4 17h3M18 6v12M15 15l3 3 3-3"/>',
+    more: '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="2.8"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+    inbox: '<path d="M4 13l2.5-8h11L20 13v6H4v-6z"/><path d="M4 13h5l1 2.5h4l1-2.5h5"/>'
+  };
+  function icon(name) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = ICONS[name];
+    return svg;
+  }
+  document.querySelectorAll('[data-icon]').forEach(function (n) {
+    n.appendChild(icon(n.getAttribute('data-icon')));
+  });
+
+  var VIEW_TITLES = { all: 'All tasks', open: 'Open', done: 'Completed' };
+  var SORT_LABELS = { newest: 'Newest first', oldest: 'Oldest first', az: 'Title A to Z' };
+
+  function recall(key, allowed, fallback) {
+    try { var v = localStorage.getItem(key); return allowed[v] ? v : fallback; } catch (e) { return fallback; }
+  }
+  function remember(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+
   var tasks = [];
-  var filter = 'all';
+  var filter = recall('tt-view', VIEW_TITLES, 'all');
+  var sort = recall('tt-sort', SORT_LABELS, 'newest');
   var editingId = null;
+  var clearArmed = false;
 
   var list = document.getElementById('list');
   var statusEl = document.getElementById('status');
@@ -171,7 +292,8 @@
   function sortTasks() {
     tasks.sort(function (a, b) {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      return b.id - a.id;
+      if (sort === 'az') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.id - b.id;
+      return sort === 'oldest' ? a.id - b.id : b.id - a.id;
     });
   }
 
@@ -181,8 +303,30 @@
   }
 
   function render() {
-    var open = tasks.filter(function (t) { return !t.completed; }).length;
-    countEl.textContent = tasks.length === 0 ? '' : open + ' open of ' + tasks.length;
+    var total = tasks.length;
+    var done = tasks.filter(function (t) { return t.completed; }).length;
+    var open = total - done;
+    countEl.textContent = total === 0 ? '' : open + ' open of ' + total;
+    document.getElementById('n-all').textContent = total;
+    document.getElementById('n-open').textContent = open;
+    document.getElementById('n-done').textContent = done;
+    document.getElementById('view-title').textContent = VIEW_TITLES[filter];
+    document.getElementById('sort-label').textContent = SORT_LABELS[sort];
+
+    document.querySelectorAll('nav.views button').forEach(function (b) {
+      if (b.getAttribute('data-filter') === filter) b.setAttribute('aria-current', 'true');
+      else b.removeAttribute('aria-current');
+    });
+    document.querySelectorAll('#sort-menu button').forEach(function (b) {
+      var on = b.getAttribute('data-sort') === sort;
+      b.setAttribute('aria-checked', String(on));
+      var tick = b.querySelector('.tick');
+      tick.textContent = '';
+      if (on) tick.appendChild(icon('check'));
+    });
+    document.getElementById('act-complete-all').disabled = open === 0;
+    document.getElementById('act-reopen-all').disabled = done === 0;
+    document.getElementById('act-clear-done').disabled = done === 0;
 
     var visible = tasks.filter(function (t) {
       return filter === 'all' || (filter === 'open' ? !t.completed : t.completed);
@@ -190,10 +334,13 @@
 
     list.textContent = '';
     if (visible.length === 0) {
-      var msg = tasks.length === 0 ? 'No tasks yet. Add your first one above.'
+      var msg = total === 0 ? 'No tasks yet. Add your first one above.'
         : filter === 'open' ? 'Nothing open. All caught up.'
         : 'No completed tasks yet.';
-      list.appendChild(el('li', { className: 'empty', text: msg }));
+      list.appendChild(el('li', { className: 'empty' }, [
+        icon(total > 0 && filter === 'open' ? 'checkCircle' : 'inbox'),
+        el('span', { text: msg })
+      ]));
       return;
     }
     visible.forEach(function (t) { list.appendChild(t.id === editingId ? editRow(t) : viewRow(t)); });
@@ -217,29 +364,29 @@
       el('div', { className: 'title', text: t.title }),
       t.notes ? el('div', { className: 'notes', text: t.notes }) : null
     ]);
-    var actions = el('div', { className: 'actions' }, [
-      el('button', { type: 'button', text: 'Edit', 'aria-label': 'Edit: ' + t.title, onclick: function () {
-        editingId = t.id; render();
-        var input = document.getElementById('edit-title');
-        if (input) input.focus();
-      } }),
-      el('button', { type: 'button', className: 'danger', text: 'Delete', 'aria-label': 'Delete: ' + t.title, onclick: function (e) {
-        e.target.disabled = true;
-        clearError();
-        api('DELETE', '/api/tasks/' + t.id)
-          .then(function () { tasks = tasks.filter(function (x) { return x.id !== t.id; }); })
-          .catch(showError)
-          .then(render);
-      } })
+    var editBtn = el('button', { type: 'button', className: 'icon-only', title: 'Edit', 'aria-label': 'Edit: ' + t.title, onclick: function () {
+      editingId = t.id; render();
+      var input = document.getElementById('edit-title');
+      if (input) input.focus();
+    } }, [icon('pencil')]);
+    var delBtn = el('button', { type: 'button', className: 'icon-only danger', title: 'Delete', 'aria-label': 'Delete: ' + t.title, onclick: function () {
+      delBtn.disabled = true;
+      clearError();
+      api('DELETE', '/api/tasks/' + t.id)
+        .then(function () { tasks = tasks.filter(function (x) { return x.id !== t.id; }); })
+        .catch(showError)
+        .then(render);
+    } }, [icon('trash')]);
+    return el('li', { className: 'task' + (t.completed ? ' done' : '') }, [
+      checkbox, body, el('div', { className: 'actions' }, [editBtn, delBtn])
     ]);
-    return el('li', { className: 'task' + (t.completed ? ' done' : '') }, [checkbox, body, actions]);
   }
 
   function editRow(t) {
     var title = el('input', { type: 'text', id: 'edit-title', value: t.title, maxLength: 200, required: true, 'aria-label': 'Task title' });
     var notes = el('textarea', { maxlength: '2000', placeholder: 'Notes (optional)', 'aria-label': 'Notes' });
     notes.value = t.notes;
-    var save = el('button', { type: 'submit', className: 'primary', text: 'Save' });
+    var save = el('button', { type: 'submit', className: 'primary with-icon' }, [icon('check'), el('span', { text: 'Save' })]);
     var cancel = el('button', { type: 'button', text: 'Cancel', onclick: function () { editingId = null; render(); } });
     var form = el('form', { className: 'edit', onsubmit: function (e) {
       e.preventDefault();
@@ -253,8 +400,7 @@
     }, onkeydown: function (e) { if (e.key === 'Escape') { editingId = null; render(); } } }, [
       title, notes, el('div', { className: 'row' }, [save, cancel])
     ]);
-    var spacer = el('span', {});
-    return el('li', { className: 'task' }, [spacer, form]);
+    return el('li', { className: 'task' }, [el('span', {}), form]);
   }
 
   addForm.addEventListener('submit', function (e) {
@@ -270,14 +416,102 @@
       .then(function () { btn.disabled = false; render(); newTitle.focus(); });
   });
 
-  document.querySelectorAll('.filters button').forEach(function (b) {
+  // Views menu
+  document.querySelectorAll('nav.views button').forEach(function (b) {
     b.addEventListener('click', function () {
       filter = b.getAttribute('data-filter');
-      document.querySelectorAll('.filters button').forEach(function (x) {
-        x.setAttribute('aria-pressed', String(x === b));
-      });
+      remember('tt-view', filter);
+      editingId = null;
       render();
     });
+  });
+
+  // Dropdown menus
+  var menus = [
+    { btn: document.getElementById('sort-btn'), menu: document.getElementById('sort-menu') },
+    { btn: document.getElementById('more-btn'), menu: document.getElementById('more-menu') }
+  ];
+  function disarmClear() {
+    clearArmed = false;
+    document.getElementById('clear-label').textContent = 'Delete completed';
+  }
+  function closeMenus(focusBtn) {
+    menus.forEach(function (m) {
+      if (!m.menu.hidden && focusBtn) m.btn.focus();
+      m.menu.hidden = true;
+      m.btn.setAttribute('aria-expanded', 'false');
+    });
+    disarmClear();
+  }
+  function items(menu) {
+    return Array.prototype.filter.call(menu.querySelectorAll('button'), function (b) { return !b.disabled; });
+  }
+  menus.forEach(function (m) {
+    m.btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var wasOpen = !m.menu.hidden;
+      closeMenus(false);
+      if (wasOpen) return;
+      m.menu.hidden = false;
+      m.btn.setAttribute('aria-expanded', 'true');
+      var first = items(m.menu)[0];
+      if (first) first.focus();
+    });
+    m.menu.addEventListener('click', function (e) { e.stopPropagation(); });
+    m.menu.addEventListener('keydown', function (e) {
+      var its = items(m.menu);
+      var i = its.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); its[(i + 1) % its.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); its[(i - 1 + its.length) % its.length].focus(); }
+      else if (e.key === 'Escape') { closeMenus(true); }
+      else if (e.key === 'Tab') { closeMenus(false); }
+    });
+  });
+  document.addEventListener('click', function () { closeMenus(false); });
+
+  document.querySelectorAll('#sort-menu button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      sort = b.getAttribute('data-sort');
+      remember('tt-sort', sort);
+      sortTasks();
+      closeMenus(true);
+      render();
+    });
+  });
+
+  // Applies one request per task, keeps going past failures, then re-renders.
+  function bulk(targets, request, apply) {
+    clearError();
+    var failed = 0;
+    return Promise.all(targets.map(function (t) {
+      return request(t).then(function (result) { apply(t, result); }).catch(function () { failed += 1; });
+    })).then(function () {
+      sortTasks();
+      if (failed) showError(new Error(failed + ' of ' + targets.length + ' tasks could not be updated. Try again.'));
+      render();
+    });
+  }
+  function setAll(completed) {
+    closeMenus(true);
+    var targets = tasks.filter(function (t) { return t.completed !== completed; });
+    bulk(targets,
+      function (t) { return api('PATCH', '/api/tasks/' + t.id, { completed: completed }); },
+      function (t, updated) { tasks = tasks.map(function (x) { return x.id === updated.id ? updated : x; }); });
+  }
+  document.getElementById('act-complete-all').addEventListener('click', function () { setAll(true); });
+  document.getElementById('act-reopen-all').addEventListener('click', function () { setAll(false); });
+  document.getElementById('act-clear-done').addEventListener('click', function () {
+    var targets = tasks.filter(function (t) { return t.completed; });
+    if (!clearArmed) {
+      // Deleting can't be undone, so ask for a second click.
+      clearArmed = true;
+      document.getElementById('clear-label').textContent = 'Click again to delete ' + targets.length;
+      return;
+    }
+    closeMenus(true);
+    bulk(targets,
+      function (t) { return api('DELETE', '/api/tasks/' + t.id); },
+      function (t) { tasks = tasks.filter(function (x) { return x.id !== t.id; }); });
   });
 
   api('GET', '/api/tasks')
